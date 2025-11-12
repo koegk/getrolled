@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>15s Countdown → Doom</title>
+  <meta name="description" content="Countdown with flashing warning and dramatic video trigger with redirect fallback." />
+  <style>
+    :root {
+      --bg: #0b0f1a;
+      --card: #121829;
+      --text: #e6e9f2;
+      --muted: #a9b2c7;
+      --danger: #ff2d55;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 800px at 80% -10%, #1b2542 0%, rgba(11,15,26,0) 70%),
+                  radial-gradient(1200px 800px at 10% 110%, #1a2e5a 0%, rgba(11,15,26,0) 70%),
+                  var(--bg);
+      display: grid; place-items: center; padding: 24px;
+    }
+
+    .flash-overlay { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: var(--danger); }
+    .flash-active { animation: flash-pulse 600ms steps(1) infinite; }
+    @keyframes flash-pulse { 0% {opacity:.85;} 50%{opacity:0;} 100%{opacity:.85;} }
+
+    .wrap { width: min(900px, 100%); text-align: center; display: grid; gap: 20px; }
+    h1 { margin: 0; font-weight: 700; font-size: clamp(28px,3.2vw,40px); }
+    p.sub { margin: 0; color: var(--muted); font-size: clamp(14px,2vw,18px); }
+
+    .seconds-box { display: grid; place-items: center; gap: 10px; background: linear-gradient(0deg,rgba(255,255,255,.02),rgba(255,255,255,.02)),var(--card); border:1px solid rgba(255,255,255,.06); border-radius:18px; padding:clamp(18px,6vw,40px); box-shadow:0 10px 30px -8px rgba(0,0,0,.35); }
+    .num { font-variant-numeric: tabular-nums; font-size: clamp(56px,16vw,180px); font-weight:900; line-height:1; }
+
+    #doomButton { display:none; background:var(--danger); border:none; color:white; font-size:1.2rem; padding:14px 28px; border-radius:8px; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,.3); transition:background .2s ease; }
+    #doomButton:hover { background:#ff4d6a; }
+
+    .video-wrap { display:none; width:min(1000px,100%); }
+    .aspect { position:relative; width:100%; padding-top:56.25%; border-radius:16px; overflow:hidden; box-shadow:0 10px 30px -8px rgba(0,0,0,.45); }
+    .aspect iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  </style>
+</head>
+<body>
+  <div id="flash" class="flash-overlay" aria-hidden="true"></div>
+  <main class="wrap" aria-live="polite">
+    <p class="sub">Seconds remaining</p>
+
+    <section id="timerSection" class="seconds-box">
+      <div class="num" id="seconds">15</div>
+    </section>
+
+    <button id="doomButton">Click Me For Suffering</button>
+
+    <section id="videoSection" class="video-wrap">
+      <div class="aspect">
+        <iframe id="rickFrame" title="Never Gonna Give You Up — Rick Astley" allow="autoplay; encrypted-media; picture-in-picture;" allowfullscreen></iframe>
+      </div>
+      <p class="sub">If playback fails, <a id="fallbackLink" href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener">click here</a>.</p>
+    </section>
+  </main>
+
+  <script>
+    const DURATION_SECONDS = 15;
+    const secondsEl = document.getElementById('seconds');
+    const flash = document.getElementById('flash');
+    const timerSection = document.getElementById('timerSection');
+    const videoSection = document.getElementById('videoSection');
+    const doomButton = document.getElementById('doomButton');
+    const rickFrame = document.getElementById('rickFrame');
+    const fallbackLink = document.getElementById('fallbackLink');
+
+    const endTime = Date.now() + DURATION_SECONDS * 1000;
+
+    function update() {
+      const diff = endTime - Date.now();
+      const secsRemaining = Math.max(0, Math.ceil(diff / 1000));
+      secondsEl.textContent = String(secsRemaining);
+
+      if (secsRemaining <= 5 && secsRemaining > 0) {
+        flash.classList.add('flash-active');
+      } else {
+        flash.classList.remove('flash-active');
+      }
+
+      if (secsRemaining === 0) {
+        flash.classList.remove('flash-active');
+        timerSection.style.display = 'none';
+        doomButton.style.display = 'inline-block';
+        clearInterval(timer);
+      }
+    }
+
+    doomButton.addEventListener('click', () => {
+      doomButton.style.display = 'none';
+      videoSection.style.display = 'block';
+
+      const params = new URLSearchParams({
+        autoplay: '1',
+        mute: '0',
+        playsinline: '1',
+        rel: '0',
+        modestbranding: '1',
+        controls: '1'
+      });
+
+      const base = 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ';
+      if (/^https?:/i.test(location.protocol)) {
+        params.set('enablejsapi', '1');
+        params.set('origin', location.origin);
+      }
+      const fullUrl = `${base}?${params.toString()}`;
+      rickFrame.src = fullUrl;
+
+      // Fallback: if embed fails to load, redirect user directly
+      rickFrame.onerror = () => {
+        window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '_blank');
+      };
+
+      // Also open in a new tab automatically if running from file:// or embed blocked
+      if (location.protocol === 'file:') {
+        window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '_blank');
+      }
+    });
+
+    const timer = setInterval(update, 200);
+    update();
+  </script>
+</body>
+</html>
